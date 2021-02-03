@@ -80,13 +80,13 @@ md = markdown.Markdown(extensions=[math_svg_extension])
 
 # Load cache (if it's there)
 math_cache_file_name = 'math_cache'
-mdx_math_svg.load_cache(math_cache_file_name)
+math_svg_extension.latex2svg.load_cache(math_cache_file_name)
 
 # Use Python-Markdown instance
 md.convert("My Markdown text")
 
 # Save cache
-mdx_math_svg.save_cache(math_cache_file_name)
+math_svg_extension.latex2svg.save_cache(math_cache_file_name)
 ```
 
 Load the cache file before you begin any Markdown parsing, and save the cache file when you're done with
@@ -112,10 +112,10 @@ The extension recognizes the following parameters:
 - `fontsize`: Font size in em for rendering LaTeX equations. Defaults to 1, matching surrounding text,
   usually. Depending on the font used, you might want to increase or decrease this value a bit.
 
-There are other things that can be configured with a bit more difficulty. The `mdx_math_svg.params`
+There are other things that can be configured with a bit more difficulty. The `math_svg_extension.latex2svg.params`
 variable is a struct containing the following:
 ```python
-mdx_math_svg.params = {
+math_svg_extension.latex2svg.params = {
     'fontsize': 1,  # em (in the sense used by CSS)
     'template': r"""
 \documentclass[12pt,preview]{standalone}
@@ -135,8 +135,8 @@ mdx_math_svg.params = {
 \usepackage{newtxmath}
 """,
     'latex_cmd': 'latex -interaction nonstopmode -halt-on-error',
-    'dvisvgm_cmd': 'dvisvgm --no-fonts --exact',
-    'libgs': None,
+    'dvisvgm_cmd': 'dvisvgm --no-fonts --exact',  # Has '--precision=2' added if the dvisvgm version is >= 2.2.2
+    'libgs': None,  # Gets set through environment variable or default location
 }
 ```
 By changing these values, it is possible to change the preamble, and the options passed to `latex` and `dvisvgm`.
