@@ -10,15 +10,15 @@ The Markdown syntax recognized is:
 $Equation$, \(Equation\)
 
 $$
-  Display Equation
+    Display Equation
 $$
 
 \[
-  Display Equation
+    Display Equation
 \]
 
 \begin{align}
-  Display Equations
+    Display Equations
 \end{align}
 ```
 
@@ -30,7 +30,9 @@ Requires Python 3.6 or newer (I presume, to be tested) and Python-Markdown 3.0 o
 well as a LaTeX installation. If you don't have LaTeX, I recommend [TeX Live](https://tug.org/texlive/).
 
 The extension uses the `latex` and `dvisvgm` commands, which should both be installed with your LaTeX
-distribution. Make sure these programs are on the path so that they can be found.
+distribution. Make sure these programs are on the path so that they can be found. If you install only a
+subset of the TeX Live distribution, you will likely need to add the following LaTeX packages using
+the `tlmgr` tool: `standalone`, `preview`, `ucs`, `newtx`, `fontaxes`, and `xstring`.
 
 ### Install from PyPI
 
@@ -54,10 +56,10 @@ The simple way to add the extension to the Python-Markdown parser is as follows:
 import markdown
 
 extension_configs = {
-  'mdx_math_svg': {
-    'inline_class': 'math',
-    'display_class': 'math'
-  }
+    'mdx_math_svg': {
+        'inline_class': 'math',
+        'display_class': 'math'
+    }
 }
 md = markdown.Markdown(extensions=['mdx_math_svg'], extension_configs=extension_configs)
 ```

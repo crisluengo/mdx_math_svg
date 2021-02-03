@@ -151,14 +151,17 @@ class LaTeX2SVG:
             'libgs': None,
         }
 
-        if not hasattr(os.environ, 'LIBGS') and not find_library('gs'):
-            if sys.platform == 'darwin':
+        if not self.params['libgs'] and not hasattr(os.environ, 'LIBGS'):
+            p = find_library('gs')
+            if p:
+                self.params['libgs'] = p
+            elif sys.platform == 'darwin':
                 # Fallback to homebrew Ghostscript on macOS
                 homebrew_libgs = '/usr/local/opt/ghostscript/lib/libgs.dylib'
                 if os.path.exists(homebrew_libgs):
                     self.params['libgs'] = homebrew_libgs
             if not self.params['libgs']:
-                print('Warning: libgs not found')
+                print('Warning: libgs not found, mdx_math_svg will not be able to properly align inline equations.')
 
         # dvisvgm 2.2.2 was changed to "avoid scientific notation of floating point numbers"
         # (https://github.com/mgieseki/dvisvgm/blob/3facb925bfe3ab47bf40d376d567a114b2bee3a5/NEWS#L90),
@@ -179,7 +182,7 @@ class LaTeX2SVG:
                     #print('dvisvgm is 2.2.2 or newer, adjusting precision')
                     self.params['dvisvgm_cmd'] = self.params['dvisvgm_cmd'] + ' --precision=2'
         except FileNotFoundError:
-            print('dvisvgm not found')
+            print('Warning: dvisvgm not found, mdx_math_svg will not work.')
             pass
 
         # Cache for rendered equations (source formula sha1 -> svg).
@@ -284,7 +287,7 @@ class LaTeX2SVG:
 
             # Patch SVG
             pt2em = self.params['fontsize'] / 10  # Unfortunately, 12pt(==1em) font is not 1em.
-            if latex.startswith(r'\('):  # Inline
+            if depth is not None and latex.startswith(r'\('):  # Inline
                 style = ' vertical-align: -{:.3f}em;'.format(depth * pt2em)
             else:
                 style = ''
