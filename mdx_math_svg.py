@@ -83,11 +83,66 @@ from hashlib import sha1
 # Code below adapted from latex2svg and latex2svgextra
 # -------------------------------------------------------
 
+# --- The Cache ---
+
 # Increase this value if generated SVG changes somehow. Stored caches will be discarded.
 _cache_version = 1
 
+def _empty_cache():
+    return {
+        'version': _cache_version,
+        'age': 0,
+        'data': {}
+    }
 
-# Various regular expressions to parse and modify the SVG.
+# Cache for rendered equations (source formula sha1 -> svg).
+# _cache[1] is a counter (the "age") used to track which latex equations were used this time around.
+# Unused equations can be pruned from the cache.
+# The cache version should be bumped if the format of the cache is changed, cache files
+# with a different version number can be discarded.
+_cache = _empty_cache()
+
+def load_cache(file):
+    """Loads cached SVG data. Use at the start of a session to avoid
+    repeating renderings done in the previous session.
+    """
+    global _cache
+    try:
+        with open(file, 'rb') as f:
+            _cache = pickle.load(f)
+            if not _cache or not isinstance(_cache, dict) or \
+                    'version' not in _cache or _cache['version'] != _cache_version:
+                # Reset the cache if not valid or not expected version
+                # TODO: If font size changes, we also need to flush the cache (but the params are no longer global...)
+                _cache = _empty_cache()
+            else:
+                # Otherwise bump cache age
+                _cache['age'] += 1
+    except FileNotFoundError:
+        _cache = _empty_cache()
+
+def save_cache(file):
+    """Saves cached SVG data. Use at the end of a session so they
+    can be recovered in your next session.
+    """
+    global _cache
+    # Don't save any file if there is nothing
+    if not _cache['data']:
+        return
+
+    # Prune entries that were not used
+    cache_to_save = _cache.copy()
+    cache_to_save['data'] = {}
+    for hash, entry in _cache['data'].items():
+        if entry[0] != _cache['age']:
+            continue
+        cache_to_save['data'][hash] = entry
+
+    with open(file, 'wb') as f:
+        pickle.dump(cache_to_save, f)
+
+
+# --- Various regular expressions to parse and modify the SVG ---
 
 # dvisvgm 1.9.2 (on Ubuntu 16.04) doesn't specify the encoding part. However
 # that version reports broken "depth", meaning inline equations are not
@@ -185,13 +240,6 @@ class LaTeX2SVG:
             print('Warning: dvisvgm not found, mdx_math_svg will not work.')
             pass
 
-        # Cache for rendered equations (source formula sha1 -> svg).
-        # _cache[1] is a counter (the "age") used to track which latex equations were used this time around.
-        # Unused equations can be pruned from the cache.
-        # The cache version should be bumped if the format of the cache is changed, cache files
-        # with a different version number can be discarded.
-        self._cache = self._empty_cache()
-
         # Counter to ensure unique IDs for multiple SVG elements on the same page.
         # Reset back to zero on start of a new page for reproducible behavior.
         # Or leave as is if you don't care.
@@ -210,7 +258,7 @@ class LaTeX2SVG:
         try:
             ret = subprocess.run(shlex.split(self.params['latex_cmd'] + ' code.tex'),
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                 cwd=working_directory, encoding='utf-8')
+                                 cwd=working_directory, encoding='cp437')
             if ret.returncode:
                 # LaTeX prints errors on stdout instead of stderr (stderr is empty),
                 # so print stdout instead
@@ -275,9 +323,10 @@ class LaTeX2SVG:
            SVG data.
         """
         # Find latex code in cache
+        global _cache
         hash = sha1(latex.encode('utf-8')).digest()
-        if hash in self._cache['data']:
-            svg = self._cache['data'][hash][1]
+        if hash in _cache['data']:
+            svg = _cache['data'][hash][1]
             #print('Found the following LaTeX in the cache:', latex)
         else:
             # It's not in the cache: compute SVG
@@ -306,7 +355,7 @@ class LaTeX2SVG:
                 assert found
 
         # Put svg in cache, note that if it was already there, we're just updating the counter
-        self._cache['data'][hash] = (self._cache['age'], svg)
+        _cache['data'][hash] = (_cache['age'], svg)
 
         # Make element IDs unique
         self.counter += 1
@@ -315,53 +364,20 @@ class LaTeX2SVG:
         return svg
 
 
-    def _empty_cache(self):
-        return {
-            'version': _cache_version,
-            'age': 0,
-            'fontsize': self.params['fontsize'],
-            'data': {}
-        }
-
-
     def load_cache(self, file):
         """Loads cached SVG data. Use at the start of a session to avoid
-        repeating renderings done in the previous session.
+        repeating renderings done in the previous session. The cache is
+        shared among all instances of this plugin.
         """
-        try:
-            with open(file, 'rb') as f:
-                self._cache = pickle.load(f)
-                if not self._cache or not isinstance(self._cache, dict) or \
-                        'version' not in self._cache or self._cache['version'] != _cache_version or \
-                        'fontsize' not in self._cache or self._cache['fontsize'] != self.params['fontsize']:
-                    # Reset the cache if not valid or not expected version
-                    # If font size changes, we also need to flush the cache
-                    self._cache = self._empty_cache()
-                else:
-                    # Otherwise bump cache age
-                    self._cache['age'] += 1
-        except FileNotFoundError:
-            self._cache = self._empty_cache()
+        load_cache(file)
 
 
     def save_cache(self, file):
         """Saves cached SVG data. Use at the end of a session so they
-        can be recovered in your next session.
+        can be recovered in your next session. The cache is shared
+        among all instances of this plugin.
         """
-        # Don't save any file if there is nothing
-        if not self._cache['data']:
-            return
-
-        # Prune entries that were not used
-        cache_to_save = self._cache.copy()
-        cache_to_save['data'] = {}
-        for hash, entry in self._cache['data'].items():
-            if entry[0] != self._cache['age']:
-                continue
-            cache_to_save['data'][hash] = entry
-
-        with open(file, 'wb') as f:
-            pickle.dump(cache_to_save, f)
+        save_cache(file)
 
 
 # -------------------------------------------------------
@@ -466,7 +482,7 @@ class BlockMathSvgProcessor(BlockProcessor):
         svg = self.latex2svg.latex2svg(latex)
         attrib_dict = {'class': self.display_class}
         if attrib and self.use_attr_list:
-            print("\nFound attrib:", attrib)
+            #print("\nFound attrib:", attrib)
             for k, v in attr_list.get_attrs(attrib):
                 if k == '.':
                     attrib_dict['class'] += ' ' + v
@@ -474,7 +490,7 @@ class BlockMathSvgProcessor(BlockProcessor):
                     attrib_dict['class'] = self.display_class + ' ' + v
                 else:
                     attrib_dict[k] = v
-            print(attrib_dict)
+            #print(attrib_dict)
             attrib = ''
 
         el = ET.SubElement(parent, 'div', attrib_dict)
@@ -502,14 +518,14 @@ class MathSvgExtension(Extension):
 
         self.config = {
             'inline_class': [
-                [''],
-                "Inline math is SVG wrapped in a <span> tag, this option adds a class name to it - Default: ''"
+                'math',
+                "Inline math is SVG wrapped in a <span> tag, this option adds a class name to it - Default: 'math'"
             ],
             'display_class': [
-                [''],
-                "Display math is SVG wrapped in a <div> tag, this option adds a class name to it - Default: ''"
+                'math',
+                "Display math is SVG wrapped in a <div> tag, this option adds a class name to it - Default: 'math'"
             ],
-            "smart_dollar": [True, "Use MathSvg's smart dollars - Default True"],
+            "smart_dollar": [True, "Use mdx_math_svg's smart dollars - Default True"],
             "block_syntax": [
                 ['dollar', 'square', 'begin'],
                 'Enable block syntax: "dollar" ($$...$$), "square" (\\[...\\]), and '
@@ -517,10 +533,14 @@ class MathSvgExtension(Extension):
             ],
             "inline_syntax": [
                 ['dollar', 'round'],
-                'Enable block syntax: "dollar" ($$...$$), "round" (\\(...\\)) '
+                'Enable block syntax: "dollar" ($$...$$), "round" (\\(...\\))'
                 ' - Default: ["dollar", "round"]'
             ],
-            "fontsize": [1, "Font size in em for rendering LaTeX equations - Default 1"]
+            "fontsize": [1, "Font size in em for rendering LaTeX equations - Default 1"],
+            "additional_preamble": [
+                [],
+                'Additional LaTeX statements to add to the preamble - Default: []'
+            ]
         }
 
         self.latex2svg = LaTeX2SVG()
@@ -537,6 +557,11 @@ class MathSvgExtension(Extension):
 
         # Configure latex2svg
         self.latex2svg.params['fontsize'] = config.get('fontsize', 1)
+        additional_preamble = config.get('additional_preamble', [])
+        if additional_preamble:
+            if not isinstance(additional_preamble, str):
+                additional_preamble = '\n'.join(additional_preamble)
+            self.latex2svg.params['preamble'] = self.latex2svg.params['preamble'] + '\n' + additional_preamble
 
         # Inline patterns
         allowed_inline = set(config.get('inline_syntax', ['dollar', 'round']))
