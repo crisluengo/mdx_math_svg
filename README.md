@@ -1,7 +1,7 @@
 # mdx\_math\_svg
 
-Python-Markdown extension to render equations as embedded SVG.  
-No MathJax, no images. Real vector drawings.  
+[Python-Markdown](https://python-markdown.github.io) extension to render equations as embedded SVG.  
+No MathJax, no images. Real vector drawings.
 
 The resulting static pages load fast and will not reflow as equations are formatted.
 
@@ -21,6 +21,18 @@ $$
     Display Equations
 \end{align}
 ```
+
+### Examples
+
+These are some examples of the use of this Markdown plugin:
+
+- My blog, prepared with [Pelican](https://blog.getpelican.com) and Python-Markdown, has some math-heavy posts,
+  for example the post "[A simple implementation of snakes](https://www.crisluengo.net/archives/217)".
+
+- The DIPlib documentation, prepared with [dox++](https://crisluengo.github.io/doxpp/), uses this plugin to
+  generate pages like [this one](https://diplib.org/diplib-docs/why_tensors.html) and function documentation like
+  [this ones](https://diplib.org/diplib-docs/nonlinear.html#dip-PeronaMalikDiffusion-dip-Image-CL-dip-Image-L-dip-uint--dip-dfloat--dip-dfloat--dip-String-CL)
+  and the ones below it.
 
 ## Installation
 
@@ -118,7 +130,26 @@ create a new instance of the plugin for each page they parse, hence the need for
 
 ### Usage in Pelican
 
-Create a file in your Pelican directory called `plugins/mdx_math_svg_cache.py`, and copy the following
+[Pelican](https://blog.getpelican.com) is a static site generator, a great way to publish a blog. If you choose
+to use it with Markdown formatted input, you can use this plugin to add great-looking equations to your
+blog.
+
+To enable the plugin, add a line to your `MARKDOWN` extension configuration setting in `pelicanconf.py` with
+the setting for the `mdx_math_svg` plugin. You should already have this variable declared, all you need to
+do is add the one line:
+```python
+MARKDOWN = {
+    'extension_configs': {
+        'markdown.extensions.codehilite': {'css_class': 'highlight'},
+        'markdown.extensions.extra': {},
+        'markdown.extensions.meta': {},
+        'mdx_math_svg': {'inline_class': 'math', 'display_class': 'math'},  # Add this line
+    },
+    'output_format': 'html5',
+}
+```
+
+Next, create a file in your Pelican directory called `plugins/mdx_math_svg_cache.py`, and copy the following
 into it:
 ```python
 import mdx_math_svg
@@ -144,12 +175,12 @@ PLUGINS = ["mdx_math_svg_cache"]
 ```
 You might already be using plugins. In this case, simply add the `mdx_math_svg_cache` plugin to the list.
 
-The plugin code contains the string `'math_cache'` twice. This is the name of the cache file. Feel free to
+The plugin code contains the string `'math_cache'`. This is the name of the cache file. Feel free to
 change its name and/or location.
 
-This cache doesn't interact well with the cache the Pelican uses. Since it purges equations not processed
+This cache doesn't interact well with the cache that Pelican uses. Since it purges equations not processed
 during the current session, only equations used during the last run of Pelican will be kept. Pages cached
-by Pelican won't be processed by this plugin.
+by Pelican won't be processed by this plugin, and hence their equations will be purged from the cache.
 
 ### Configuration parameters
 
@@ -169,7 +200,8 @@ The extension recognizes the following parameters:
 - `fontsize`: Font size in em for rendering LaTeX equations. Defaults to 1, matching surrounding text,
   usually. Depending on the font used, you might want to increase or decrease this value a bit.
 - `additional_preamble`: LaTeX commands to add to the LaTeX document preamble. Can be used to load
-  additional packages, for example. Either a string or an array of strings. Defaults to `[]`.
+  additional packages, for example. Either a string or an array of strings. Defaults to `[]`.  
+  For example, I like to use `'additional_preamble': [r'\usepackage{nicefrac}']` to enable the `\nicefrac` command.
 
 There are other things that can be configured with a bit more difficulty. The `math_svg_extension.latex2svg.params`
 variable is a struct containing the following:
