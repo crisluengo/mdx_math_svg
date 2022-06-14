@@ -22,7 +22,7 @@ $$
 ```
 
 
-Copyright 2021 by Cris Luengo
+Copyright 2021-2022 by Cris Luengo
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 documentation files (the "Software"), to deal in the Software without restriction, including without limitation
@@ -161,7 +161,7 @@ _patch26_src = re.compile(r"""<\?xml version='1\.0' encoding='UTF-8'\?>
 """)
 
 # version ignored by all UAs, safe to drop https://stackoverflow.com/a/18468348
-_patch_dst = r"""<svg{attribs} style="width: {width:.3f}em; height: {height:.3f}em;{style}" viewBox="{viewBox}">
+_patch_dst = r"""<svg{attribs} style="width: {width:.3f}em; height: {height:.3f}em; vertical-align: {offset:.3f}em; {style}" viewBox="{viewBox}">
 <title>
 {formula}
 </title>
@@ -341,11 +341,20 @@ class LaTeX2SVG:
             else:
                 style = ''
             def repl(match):
+                width = float(match.group('width'))
+                height = float(match.group('height'))
+                viewBox = match.group('viewBox')
+                values = viewBox.split(' ')
+                if len(values) == 4:
+                    offset = -(float(values[3]) + float(values[1])) / float(values[3]) * height
+                else:
+                    offset = 0
                 return _patch_dst.format(
-                    width=float(match.group('width')) * pt2em,
-                    height=float(match.group('height')) * pt2em,
+                    width=width * pt2em,
+                    height=height * pt2em,
+                    offset=offset * pt2em,
                     style=style,
-                    viewBox=match.group('viewBox'),
+                    viewBox=viewBox,
                     attribs='',
                     formula=html.escape(latex))
             # There are two incompatible preambles, if the first fails try the second
